@@ -110,6 +110,12 @@ void MulticopterLandDetector::_update_topics()
 		}
 	}
 
+	control_allocator_status_s control_allocator_status;
+
+	if (_control_allocator_status_sub.update(&control_allocator_status)) {
+		_motor_failure_handled = control_allocator_status.handled_motor_failure_mask != 0;
+	}
+
 	takeoff_status_s takeoff_status;
 
 	if (_takeoff_status_sub.update(&takeoff_status)) {
@@ -303,7 +309,9 @@ bool MulticopterLandDetector::_get_maybe_landed_state()
 		max_rotation_threshold *= 2.5f;
 	}
 
-	const bool rotational_movement = _angular_velocity.xy().norm() > max_rotation_threshold;
+	// After a motor failure the vehicle may spin about a tilted axis, which shows up as roll and pitch rate.
+	// Rely on ground contact and thrust then.
+	const bool rotational_movement = _angular_velocity.xy().norm() > max_rotation_threshold && !_motor_failure_handled;
 	_land_detected.rotational_movement |= rotational_movement;
 
 	// If vertical velocity is available: ground contact, no thrust, no movement -> landed

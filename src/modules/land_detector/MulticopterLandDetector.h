@@ -42,6 +42,7 @@
 
 #pragma once
 
+#include <uORB/topics/control_allocator_status.h>
 #include <uORB/topics/hover_thrust_estimate.h>
 #include <uORB/topics/trajectory_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
@@ -91,11 +92,14 @@ private:
 	} _params{};
 
 	uORB::Subscription _vehicle_thrust_setpoint_sub{ORB_ID(vehicle_thrust_setpoint)};
+	uORB::Subscription _control_allocator_status_sub{ORB_ID(control_allocator_status)};
 	uORB::Subscription _hover_thrust_estimate_sub{ORB_ID(hover_thrust_estimate)};
 	uORB::Subscription _trajectory_setpoint_sub{ORB_ID(trajectory_setpoint)};
 
 	uORB::Subscription _vehicle_control_mode_sub{ORB_ID(vehicle_control_mode)};
 	uORB::Subscription _takeoff_status_sub{ORB_ID(takeoff_status)};
+
+	bool _motor_failure_handled{false}; ///< a failed motor is out of the allocation: the vehicle may spin
 
 	float _hover_thrust_estimate{NAN};
 	hrt_abstime _hover_thrust_estimate_last_valid{0};
