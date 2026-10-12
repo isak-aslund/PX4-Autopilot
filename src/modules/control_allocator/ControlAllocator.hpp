@@ -186,6 +186,7 @@ private:
 		IGNORE = 0,
 		REMOVE_AND_STOP_OPPOSITE = 1,     ///< remove failed motor; on a hexarotor also stop its geometric opposite
 		REMOVE_AND_REVERSE_OPPOSITE = 2,  ///< remove failed motor; on a hexarotor reverse its geometric opposite
+		REMOVE_AND_GIVE_UP_YAW = 3,       ///< remove failed motor and drop the yaw axis from the allocation (spin, see MC_SPN_EN)
 	};
 
 	EffectivenessSource _effectiveness_source_id{EffectivenessSource::NONE};

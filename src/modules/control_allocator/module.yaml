@@ -634,6 +634,7 @@ parameters:
                 0: Ignore
                 1: Remove failed motor and stop its opposite
                 2: Remove failed motor and reverse its opposite
+                3: Remove failed motor and give up yaw (spin, see MC_SPN_EN)
             default: 0
 
         CA_ICE_PERIOD:

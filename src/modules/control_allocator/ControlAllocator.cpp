@@ -571,6 +571,16 @@ ControlAllocator::update_effectiveness_matrix_if_needed(EffectivenessUpdateReaso
 				++actuator_idx_matrix[selected_matrix];
 				++actuator_idx;
 			}
+
+			if ((FailureMode)_param_ca_failure_mode.get() == FailureMode::REMOVE_AND_GIVE_UP_YAW) {
+				// A quadrotor with three motors cannot hold yaw: drop the yaw row so that roll, pitch
+				// and thrust are allocated exactly and the vehicle spins freely about yaw
+				for (int m = 0; m < _num_control_allocation; ++m) {
+					for (int j = 0; j < ActuatorEffectiveness::NUM_ACTUATORS; j++) {
+						config.effectiveness_matrices[m](ControlAllocation::ControlAxis::YAW, j) = 0.f;
+					}
+				}
+			}
 		}
 
 		for (int i = 0; i < _num_control_allocation; ++i) {
@@ -831,7 +841,8 @@ ControlAllocator::check_for_motor_failures()
 	failure_detector_status_s failure_detector_status;
 	const FailureMode failure_mode = static_cast<FailureMode>(_param_ca_failure_mode.get());
 
-	if ((failure_mode == FailureMode::REMOVE_AND_STOP_OPPOSITE || failure_mode == FailureMode::REMOVE_AND_REVERSE_OPPOSITE)
+	if ((failure_mode == FailureMode::REMOVE_AND_STOP_OPPOSITE || failure_mode == FailureMode::REMOVE_AND_REVERSE_OPPOSITE
+	     || failure_mode == FailureMode::REMOVE_AND_GIVE_UP_YAW)
 	    && _failure_detector_status_sub.update(&failure_detector_status)) {
 
 		if (_motor_stop_mask != failure_detector_status.motor_stop_mask) {
