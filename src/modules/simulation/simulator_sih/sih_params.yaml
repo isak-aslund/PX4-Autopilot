@@ -254,6 +254,29 @@ parameters:
       type: float
       default: -1.0
       unit: m
+    SIH_MOT_FAIL:
+      description:
+        short: Motor that has failed
+        long: |
+          The motor with this number (1-based) produces no thrust or torque, whatever it is commanded.
+          The ESC still reports telemetry (zero current and RPM), so the failure detector can find it.
+          0 means all motors work.
+      type: int32
+      default: 0
+      min: 0
+      max: 8
+    SIH_W_MAX:
+      description:
+        short: Body rate limit
+        long: |
+          The simulated body rates are clamped to this value.
+          Real gyros saturate around 2000 deg/s (35 rad/s).
+      type: float
+      default: 18.85
+      min: 1.0
+      max: 50.0
+      unit: rad/s
+      decimal: 2
     SIH_T_TAU:
       description:
         short: thruster time constant tau

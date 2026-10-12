@@ -363,6 +363,15 @@ void Sih::parameters_updated()
 	_px4_rangefinder.set_max_distance(_distance_snsr_max);
 
 	_T_TAU = _sih_thrust_tau.get();
+	_w_max = _sih_w_max.get();
+
+	if (_sih_mot_fail.get() - 1 != _motor_failed) {
+		_motor_failed = _sih_mot_fail.get() - 1;
+
+		if (_motor_failed >= 0) {
+			PX4_WARN("SIH: motor %d failed", _motor_failed + 1);
+		}
+	}
 
 	_v_wind_N = Vector3f(_sih_wind_n.get(), _sih_wind_e.get(), 0.f);
 }
@@ -382,6 +391,10 @@ void Sih::read_motors(const float dt)
 				float u_sp = actuators_out.output[i];
 				_u[i] = _u[i] + dt / _T_TAU * (u_sp - _u[i]); // first order transfer function with time constant tau
 			}
+		}
+
+		if (_motor_failed >= 0 && _motor_failed < NUM_ACTUATORS_MAX) {
+			_u[_motor_failed] = 0.f; // dead motor: the ESC is commanded but nothing turns
 		}
 
 		publish_esc_status();
@@ -431,6 +444,8 @@ void Sih::publish_esc_status()
 		_esc_status.esc[motor_idx].actuator_function = esc_report_s::ACTUATOR_FUNCTION_MOTOR1 + motor_idx;
 		_esc_status.esc[motor_idx].esc_temperature = 50.f;
 		_esc_status.esc[motor_idx].esc_rpm = (int32_t)roundf(Thruster::throttle_to_rpm(_u[i], max_rpm));
+		_esc_status.esc[motor_idx].esc_current = 35.f * _u[i]; // matches the MOTFAIL_C2T default
+		_esc_status.esc[motor_idx].esc_voltage = 16.f;
 		_esc_status.esc_online_flags |= 1u << motor_idx;
 
 		if (_u[i] > FLT_EPSILON) {
@@ -705,7 +720,7 @@ void Sih::equations_of_motion(const float dt)
 	_q_E.normalize();
 
 	const Vector3f w_B_dot = _Im1 * (_Mt_B + _Ma_B - _w_B.cross(_I * _w_B)); // conservation of angular momentum
-	_w_B = constrain(_w_B + w_B_dot * dt, -6.0f * M_PI_F, 6.0f * M_PI_F);
+	_w_B = constrain(_w_B + w_B_dot * dt, -_w_max, _w_max);
 
 	ecefToNed();
 

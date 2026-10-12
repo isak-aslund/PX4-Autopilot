@@ -265,6 +265,8 @@ private:
 	matrix::Vector3f _lpos{};  // position in a local tangent-plane frame [m]
 
 	float _u[NUM_ACTUATORS_MAX] {}; // thruster signals
+	int _motor_failed{-1};          // index of the motor that produces nothing, whatever it is commanded
+	float _w_max{6.f * M_PI_F};     // body rate limit [rad/s]
 	float       _T[NUM_DYN_THRUSTER] {};         // thruster forces (N)
 	float       _Q[NUM_DYN_THRUSTER] {};         // thruster torque (Nm)
 	Thruster    _thruster[NUM_DYN_THRUSTER] {};	// thruster objects
@@ -340,6 +342,8 @@ private:
 		(ParamFloat<px4::params::SIH_DISTSNSR_MAX>) _sih_distance_snsr_max,
 		(ParamFloat<px4::params::SIH_DISTSNSR_OVR>) _sih_distance_snsr_override,
 		(ParamFloat<px4::params::SIH_T_TAU>) _sih_thrust_tau,
+		(ParamInt<px4::params::SIH_MOT_FAIL>) _sih_mot_fail,
+		(ParamFloat<px4::params::SIH_W_MAX>) _sih_w_max,
 		// forward propeller
 		(ParamFloat<px4::params::SIH_F_T_MAX>) _sih_f_thrust_max,
 		(ParamFloat<px4::params::SIH_F_Q_MAX>) _sih_f_torque_max,
