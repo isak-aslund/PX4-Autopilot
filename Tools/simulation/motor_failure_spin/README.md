@@ -124,6 +124,29 @@ Same dynamics as SIH, used to design and sweep the controller.
   (F4). Solve a gain table over the spin rate in the background instead, when parameters change.
 * Flash: +11 KB on px4_fmu-v6x (99.2 % → 99.8 %). It should sit behind a Kconfig option.
 
+## How accurate does the model have to be? (`sweep_model_error.py`)
+
+The controller gets a wrong copy of the vehicle; the simulated vehicle keeps the true values.
+Detection 0.1 s, Python model. "ok" = holds position with steady motors at the end.
+
+| model error | true motor τ 50 ms | true motor τ 100 ms |
+|---|---|---|
+| exact | ok, 7.6 m lost | ok, 10.5 m lost |
+| one parameter ×0.5 … ×2 | all ok (Ixx ×2: 15 m lost) | ok except Ixx ×2, Izz ×0.5, ARM×TMAX ×1.5 and ×2 |
+| all parameters at random within ±25 % | 30/30 ok | 30/30 ok |
+| all parameters at random within ±50 % | 28/30 ok | 22/30 ok |
+| yaw damping quadratic in the spin rate (model: linear) | ok | ok |
+
+* The failures all **underestimate Izz/Ixx** (Izz low, Ixx high) or **overestimate the torque
+  authority** (ARM × TMAX high). The opposite errors are harmless, so when unsure, guess the
+  inertia ratio high and the motor thrust low.
+* Yaw damping (`KDW`) and mass hardly matter: the controller uses the measured spin rate.
+* In PX4 `MC_SPN_TMAX` does not scale the thrust (the thrust setpoint stays normalised); it only
+  scales the torque together with `MC_SPN_ARM`, so the two are tested as one product.
+* This only covers parameter errors in the same model structure. Effects neither the Python model
+  nor SIH has (propellers in edgewise flow at r × arm ≈ 5 m/s, slower spin-down than spin-up,
+  thrust nonlinearity, battery sag) are not covered.
+
 ## Does it scale to a large, slow quad? (`sweep_scale.py`)
 
 The 1 kg vehicle scaled geometrically (mass s³, inertia s⁵, yaw damping s^4.5), Python model,
