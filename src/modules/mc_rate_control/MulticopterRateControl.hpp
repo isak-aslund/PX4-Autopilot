@@ -35,6 +35,7 @@
 
 #include <lib/rate_control/gain_compression.hpp>
 #include <lib/rate_control/rate_control.hpp>
+#include "SpinRecoveryControl.hpp"
 #include <lib/mathlib/math/filter/AlphaFilter.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
@@ -55,6 +56,8 @@
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/rate_ctrl_status.h>
 #include <uORB/topics/vehicle_angular_velocity.h>
+#include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_attitude_setpoint.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_land_detected.h>
 #include <uORB/topics/vehicle_rates_setpoint.h>
@@ -96,6 +99,13 @@ private:
 	RateControl _rate_control; ///< class for rate control calculations
 	GainCompression3d _gain_compression; ///< reduces the loop gain when an oscillation is detected
 
+	/** after a motor failure: spin about yaw and control the thrust direction (MC_SPN_EN) */
+	bool runSpinRecovery(const matrix::Vector3f &rates, float dt, matrix::Vector3f &torque_sp, matrix::Vector3f &thrust_sp);
+
+	SpinRecoveryControl _spin_control;
+	uint16_t _handled_motor_failure_mask{0};
+	int _spin_failed_motor{-1};
+
 	uORB::Subscription _battery_status_sub{ORB_ID(battery_status)};
 	uORB::Subscription _control_allocator_status_sub{ORB_ID(control_allocator_status)};
 	uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
@@ -103,6 +113,11 @@ private:
 	uORB::Subscription _vehicle_land_detected_sub{ORB_ID(vehicle_land_detected)};
 	uORB::Subscription _vehicle_rates_setpoint_sub{ORB_ID(vehicle_rates_setpoint)};
 	uORB::Subscription _vehicle_status_sub{ORB_ID(vehicle_status)};
+	uORB::Subscription _vehicle_attitude_sub{ORB_ID(vehicle_attitude)};
+	uORB::Subscription _vehicle_attitude_setpoint_sub{ORB_ID(vehicle_attitude_setpoint)};
+
+	vehicle_attitude_setpoint_s _vehicle_attitude_setpoint{};
+	matrix::Quatf _attitude{};
 
 	uORB::SubscriptionInterval _parameter_update_sub{ORB_ID(parameter_update), 1_s};
 
@@ -170,6 +185,15 @@ private:
 		(ParamBool<px4::params::MC_BAT_SCALE_EN>) _param_mc_bat_scale_en,
 
 		(ParamBool<px4::params::MC_GC_EN>) _param_mc_gc_en,
-		(ParamFloat<px4::params::MC_GC_GAIN_MIN>) _param_mc_gc_gain_min
+		(ParamFloat<px4::params::MC_GC_GAIN_MIN>) _param_mc_gc_gain_min,
+		(ParamBool<px4::params::MC_SPN_EN>) _param_mc_spn_en,
+		(ParamFloat<px4::params::MC_SPN_IXX>) _param_mc_spn_ixx,
+		(ParamFloat<px4::params::MC_SPN_IZZ>) _param_mc_spn_izz,
+		(ParamFloat<px4::params::MC_SPN_KDW>) _param_mc_spn_kdw,
+		(ParamFloat<px4::params::MC_SPN_TMAX>) _param_mc_spn_tmax,
+		(ParamFloat<px4::params::MC_SPN_ARM>) _param_mc_spn_arm,
+		(ParamFloat<px4::params::MC_SPN_TAU>) _param_mc_spn_tau,
+		(ParamFloat<px4::params::MC_SPN_OPP>) _param_mc_spn_opp,
+		(ParamFloat<px4::params::MC_SPN_TILT>) _param_mc_spn_tilt
 	)
 };

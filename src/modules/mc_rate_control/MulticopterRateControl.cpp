@@ -101,6 +101,17 @@ MulticopterRateControl::parameters_updated()
 	_acro_rate_max = Vector3f(radians(_param_mc_acro_r_max.get()), radians(_param_mc_acro_p_max.get()),
 				  radians(_param_mc_acro_y_max.get()));
 
+	SpinRecoveryControl::Params spin_params{};
+	spin_params.ixx = _param_mc_spn_ixx.get();
+	spin_params.izz = _param_mc_spn_izz.get();
+	spin_params.kdw = _param_mc_spn_kdw.get();
+	spin_params.motor_thrust_max = _param_mc_spn_tmax.get();
+	spin_params.arm = _param_mc_spn_arm.get();
+	spin_params.motor_tau = _param_mc_spn_tau.get();
+	spin_params.opposite_ratio = _param_mc_spn_opp.get();
+	spin_params.tilt_max = radians(_param_mc_spn_tilt.get());
+	_spin_control.setParams(spin_params);
+
 	_output_lpf_yaw.setCutoffFreq(_param_mc_yaw_tq_cutoff.get());
 }
 
@@ -222,18 +233,26 @@ MulticopterRateControl::Run()
 
 				// TODO: send the unallocated value directly for better anti-windup
 				_rate_control.setSaturationStatus(saturation_positive, saturation_negative);
+
+				_handled_motor_failure_mask = control_allocator_status.handled_motor_failure_mask;
 			}
 
-			// run rate controller
-			Vector3f torque_setpoint =
-				_rate_control.update(rates, _rates_setpoint, angular_accel, dt, _maybe_landed || _landed);
+			Vector3f torque_setpoint;
 
-			// reduce the loop gain when an oscillation is detected on the controller output
-			torque_setpoint = _gain_compression.getGains().emult(torque_setpoint);
-			_gain_compression.update(torque_setpoint, dt);
+			if (runSpinRecovery(rates, dt, torque_setpoint, _thrust_setpoint)) {
+				_rate_control.resetIntegral();
 
-			// apply low-pass filtering on yaw axis to reduce high frequency torque caused by rotor acceleration
-			torque_setpoint(2) = _output_lpf_yaw.update(torque_setpoint(2), dt);
+			} else {
+				// run rate controller
+				torque_setpoint = _rate_control.update(rates, _rates_setpoint, angular_accel, dt, _maybe_landed || _landed);
+
+				// reduce the loop gain when an oscillation is detected on the controller output
+				torque_setpoint = _gain_compression.getGains().emult(torque_setpoint);
+				_gain_compression.update(torque_setpoint, dt);
+
+				// apply low-pass filtering on yaw axis to reduce high frequency torque caused by rotor acceleration
+				torque_setpoint(2) = _output_lpf_yaw.update(torque_setpoint(2), dt);
+			}
 
 			// publish rate controller status
 			rate_ctrl_status_s rate_ctrl_status{};
@@ -282,6 +301,48 @@ MulticopterRateControl::Run()
 	}
 
 	perf_end(_loop_perf);
+}
+
+bool MulticopterRateControl::runSpinRecovery(const Vector3f &rates, float dt, Vector3f &torque_sp, Vector3f &thrust_sp)
+{
+	// only a single failed motor on a quadrotor, handled by the allocator
+	const uint16_t mask = _handled_motor_failure_mask;
+	const bool single_quad_motor = (mask != 0) && ((mask & (mask - 1)) == 0) && (mask < (1u << 4));
+
+	if (!_param_mc_spn_en.get() || !single_quad_motor || !_vehicle_control_mode.flag_armed) {
+		_spin_failed_motor = -1;
+		return false;
+	}
+
+	int failed_motor = 0;
+
+	while (!(mask & (1u << failed_motor))) {
+		failed_motor++;
+	}
+
+	if (failed_motor != _spin_failed_motor) {
+		_spin_failed_motor = failed_motor;
+		_spin_control.reset(failed_motor);
+		PX4_WARN("motor %d failed: spinning about yaw", failed_motor + 1);
+	}
+
+	vehicle_attitude_s vehicle_attitude;
+
+	if (_vehicle_attitude_sub.update(&vehicle_attitude)) {
+		_attitude = Quatf(vehicle_attitude.q);
+	}
+
+	_vehicle_attitude_setpoint_sub.update(&_vehicle_attitude_setpoint);
+
+	// desired thrust vector in NED; without a recent attitude setpoint (e.g. Acro) hold level
+	Vector3f thrust_ned{0.f, 0.f, _thrust_setpoint(2)};
+
+	if (hrt_elapsed_time(&_vehicle_attitude_setpoint.timestamp) < 200_ms) {
+		thrust_ned = Quatf(_vehicle_attitude_setpoint.q_d).rotateVector(Vector3f(_vehicle_attitude_setpoint.thrust_body));
+	}
+
+	_spin_control.update(rates, _attitude, thrust_ned, dt, torque_sp, thrust_sp);
+	return true;
 }
 
 void MulticopterRateControl::updateActuatorControlsStatus(const vehicle_torque_setpoint_s &vehicle_torque_setpoint,

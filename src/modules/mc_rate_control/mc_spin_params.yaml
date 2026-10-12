@@ -1,0 +1,91 @@
+module_name: mc_rate_control
+parameters:
+- group: Multicopter Motor Failure Spin
+  definitions:
+    MC_SPN_EN:
+      description:
+        short: Spin about yaw after a motor failure (experimental)
+        long: |
+          When the control allocator has removed a failed motor of a quadrotor (CA_FAILURE_MODE 3),
+          the vehicle gives up yaw and spins. The rate controller then points the spin axis along
+          the desired thrust direction instead of tracking the attitude controller's rates.
+          Needs a model of the vehicle (MC_SPN_*).
+      type: boolean
+      default: 0
+    MC_SPN_IXX:
+      description:
+        short: Roll and pitch moment of inertia
+      type: float
+      default: 0.01
+      min: 0.0001
+      max: 10.0
+      unit: kg m^2
+      decimal: 4
+    MC_SPN_IZZ:
+      description:
+        short: Yaw moment of inertia
+        long: For a flat X frame about MC_SPN_IXX + MC_SPN_IYY.
+      type: float
+      default: 0.018
+      min: 0.0001
+      max: 10.0
+      unit: kg m^2
+      decimal: 4
+    MC_SPN_KDW:
+      description:
+        short: Rotational damping
+        long: Aerodynamic moment per body rate. Sets the spin rate the vehicle settles at.
+      type: float
+      default: 0.005
+      min: 0.0
+      max: 1.0
+      unit: Nm/(rad/s)
+      decimal: 4
+    MC_SPN_TMAX:
+      description:
+        short: Thrust of one motor at full command
+      type: float
+      default: 6.0
+      min: 0.1
+      max: 500.0
+      unit: N
+      decimal: 2
+    MC_SPN_ARM:
+      description:
+        short: Motor offset along body x and y
+        long: For an X frame with arm length l, l / sqrt(2).
+      type: float
+      default: 0.2
+      min: 0.01
+      max: 5.0
+      unit: m
+      decimal: 3
+    MC_SPN_TAU:
+      description:
+        short: Motor time constant
+      type: float
+      default: 0.05
+      min: 0.005
+      max: 0.5
+      unit: s
+      decimal: 3
+    MC_SPN_OPP:
+      description:
+        short: Thrust share of the motor opposite the failed one
+        long: |
+          Ratio of its thrust to the thrust of each of the other two motors while hovering.
+          Higher spreads the load and slows the spin, but tilts the body further.
+      type: float
+      default: 0.5
+      min: 0.0
+      max: 1.0
+      decimal: 2
+    MC_SPN_TILT:
+      description:
+        short: Largest tilt of the spin axis from body z
+      type: float
+      default: 25.0
+      min: 0.0
+      max: 45.0
+      unit: deg
+      decimal: 1
